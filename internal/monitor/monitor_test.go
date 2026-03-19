@@ -2,6 +2,7 @@ package monitor_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,7 +102,7 @@ func TestProcessCheckStatus_Failure_CancelsAndAdvances(t *testing.T) {
 
 	entry, _ := svc.GetEntry(ctx, repoID, 42)
 
-	if err := monitor.ProcessCheckStatus(ctx, deps, entry, "ci/build", pg.CheckStateFailure, ""); err != nil {
+	if err := monitor.ProcessCheckStatus(ctx, deps, entry, "ci/build", pg.CheckStateFailure, "https://ci.example.com/build/42"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,8 +113,13 @@ func TestProcessCheckStatus_Failure_CancelsAndAdvances(t *testing.T) {
 	if len(mock.CallsTo("CancelAutoMerge")) != 1 {
 		t.Fatal("expected CancelAutoMerge")
 	}
-	if len(mock.CallsTo("CreateComment")) != 1 {
+	commentCalls := mock.CallsTo("CreateComment")
+	if len(commentCalls) != 1 {
 		t.Fatal("expected failure comment")
+	}
+	commentBody := commentCalls[0].Args[3].(string)
+	if !strings.Contains(commentBody, "[ci/build](https://ci.example.com/build/42)") {
+		t.Fatalf("expected markdown link in comment, got: %s", commentBody)
 	}
 	if len(mock.CallsTo("DeleteBranch")) != 1 {
 		t.Fatal("expected merge branch cleanup")
